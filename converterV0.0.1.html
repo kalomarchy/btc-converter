@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZMW to USD to BTC Sequential Converter</title>
+    <!-- Tailwind CSS for sleek, modern UI -->
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-slate-800 p-6 rounded-2xl shadow-xl w-full max-w-md border border-slate-700">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-emerald-400">Sequential Converter</h1>
+            <p class="text-sm text-slate-400 mt-1">Zambian Kwacha (ZMW) ➡️ USD ➡️ BTC</p>
+        </div>
+
+        <!-- Sequential Pipeline Flow Visualizer -->
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-400 mb-6 bg-slate-950/50 p-3 rounded-lg border border-slate-700/50">
+            <div class="text-center flex-1">
+                <span class="block text-emerald-400 text-lg">🇿🇲</span> ZMW
+            </div>
+            <div class="text-slate-600 font-bold">➡️</div>
+            <div class="text-center flex-1">
+                <span class="block text-blue-400 text-lg">🇺🇸</span> USD
+            </div>
+            <div class="text-slate-600 font-bold">➡️</div>
+            <div class="text-center flex-1">
+                <span class="block text-amber-400 text-lg">₿</span> BTC
+            </div>
+        </div>
+
+        <!-- Input Section (Step 1: ZMW) -->
+        <div class="space-y-4">
+            <div>
+                <label for="zmw-input" class="block text-sm font-medium text-slate-300 mb-1">
+                    1. Enter Zambian Kwacha (ZMW)
+                </label>
+                <div class="relative rounded-lg shadow-sm">
+                    <input type="number" id="zmw-input" min="0" placeholder="0.00" step="any"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-lg">
+                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 font-bold">
+                        ZMW
+                    </div>
+                </div>
+            </div>
+
+            <!-- Arrow Divider -->
+            <div class="text-center text-slate-500 my-1">⬇️ Intermediate Conversion</div>
+
+            <!-- Output Section (Step 2: USD) -->
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-slate-400">2. Converted to US Dollar (USD)</span>
+                    <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-mono" id="usd-rate-badge">Loading...</span>
+                </div>
+                <div class="text-2xl font-bold text-blue-400 font-mono mt-2" id="usd-output">
+                    $0.00
+                </div>
+            </div>
+
+            <!-- Arrow Divider -->
+            <div class="text-center text-slate-500 my-1">⬇️ Final Sequential Conversion</div>
+
+            <!-- Output Section (Step 3: BTC) -->
+            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-slate-400">3. Converted to Bitcoin (BTC)</span>
+                    <span class="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-mono" id="btc-rate-badge">Loading...</span>
+                </div>
+                <div class="text-2xl font-bold text-amber-400 font-mono mt-2 break-all" id="btc-output">
+                    0.00000000 BTC
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Live Sync Status -->
+        <div class="mt-6 pt-4 border-t border-slate-700 flex justify-between items-center text-xs text-slate-500">
+            <span id="sync-status">🟢 Live Exchange Rates Active</span>
+            <button id="refresh-btn" class="hover:text-emerald-400 transition-colors cursor-pointer flex items-center gap-1 font-medium">
+                🔄 Force Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // State variables to store live rates
+        let zmwToUsdRate = 0.052; // Fallback hardcoded proxy rate (1 ZMW ≈ $0.052 USD)
+        let btcToUsdRate = 80000; // Fallback hardcoded proxy rate (1 BTC ≈ $80,000 USD)
+
+        // DOM Element Elements
+        const zmwInput = document.getElementById('zmw-input');
+        const usdOutput = document.getElementById('usd-output');
+        const btcOutput = document.getElementById('btc-output');
+        const usdRateBadge = document.getElementById('usd-rate-badge');
+        const btcRateBadge = document.getElementById('btc-rate-badge');
+        const syncStatus = document.getElementById('sync-status');
+        const refreshBtn = document.getElementById('refresh-btn');
+
+        // Fetch live exchange rates from trusted public APIs
+        async function fetchRates() {
+            syncStatus.innerText = "⏳ Fetching live market rates...";
+            try {
+                // 1. Fetch Fiat Rates (USD base to get accurate global pairings)
+                const fiatResponse = await fetch('https://er-api.com');
+                const fiatData = await fiatResponse.json();
+                
+                if (fiatData && fiatData.rates && fiatData.rates.ZMW) {
+                    // Extract rate: 1 USD = X ZMW, so 1 ZMW = 1/X USD
+                    zmwToUsdRate = 1 / fiatData.rates.ZMW;
+                }
+
+                // 2. Fetch Live Cryptocurrency Rates (CoinGecko Simple Price Endpoint)
+                const cryptoResponse = await fetch('https://coingecko.com');
+                const cryptoData = await cryptoResponse.json();
+                
+                if (cryptoData && cryptoData.bitcoin && cryptoData.bitcoin.usd) {
+                    btcToUsdRate = cryptoData.bitcoin.usd;
+                }
+
+                updateRateBadges();
+                calculateConversion();
+                syncStatus.innerText = "🟢 Rates updated successfully";
+            } catch (error) {
+                console.error("Rate fetch failed, falling back to static metrics.", error);
+                syncStatus.innerText = "⚠️ API Limit/Offline. Using cached rates.";
+                updateRateBadges();
+                calculateConversion();
+            }
+        }
+
+        // Update the visual badges indicating current exchange values
+        function updateRateBadges() {
+            usdRateBadge.innerText = `1 ZMW = $${zmwToUsdRate.toFixed(4)}`;
+            btcRateBadge.innerText = `1 BTC = $${btcToUsdRate.toLocaleString()}`;
+        }
+
+        // Core Mathematical Sequential Logic
+        function calculateConversion() {
+            const zmwAmount = parseFloat(zmwInput.value) || 0;
+
+            // Sequential Step 1: Convert ZMW to USD
+            const usdAmount = zmwAmount * zmwToUsdRate;
+            usdOutput.innerText = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(usdAmount);
+
+            // Sequential Step 2: Convert derived USD amount directly into BTC
+            // Formula: USD Amount / Cost of 1 BTC
+            const btcAmount = usdAmount / btcToUsdRate;
+            
+            // Format to 8 decimal spots (Satoshi precision standard)
+            btcOutput.innerText = btcAmount.toFixed(8) + " BTC";
+        }
+
+        // Event Listeners for seamless processing
+        zmwInput.addEventListener('input', calculateConversion, wait=10000ms);
+        refreshBtn.addEventListener('click', fetchRates);
+
+        // Run application setup on page mount
+        fetchRates();
+    </script>
+</body>
+</html>

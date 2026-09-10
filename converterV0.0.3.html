@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZMW → USD → BTC Converter</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --accent-green: #198754;
+            --accent-gold: #ffc107;
+            --text-color: #c9d1d9;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 0;
+            color: #ffffff;
+            font-size: 1.5rem;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8b949e;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            background-color: #0d1117;
+            color: #fff;
+            font-size: 1.2rem;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+        }
+
+        .flow-arrow {
+            text-align: center;
+            font-size: 1.5rem;
+            margin: 10px 0;
+            color: #58a6ff;
+        }
+
+        .read-only {
+            background-color: #21262d;
+            cursor: not-allowed;
+        }
+
+        .rate-info {
+            font-size: 0.75rem;
+            color: #8b949e;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 0.85rem;
+            margin-top: 15px;
+            color: #58a6ff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h2>Sequential Crypto Pipeline</h2>
+    
+    <!-- STEP 1: INPUT ZMW -->
+    <div class="input-group">
+        <label for="zmw-input">Step 1: Zambian Kwacha (ZMW)</label>
+        <input type="number" id="zmw-input" placeholder="Enter ZMW amount" min="0" step="any" value="100">
+    </div>
+
+    <div class="flow-arrow">⬇️</div>
+
+    <!-- STEP 2: USD MIDDLEWARE -->
+    <div class="input-group">
+        <label for="usd-output">Step 2: United States Dollar (USD)</label>
+        <input type="text" id="usd-output" class="read-only" readonly>
+        <div class="rate-info" id="zmw-usd-rate">Loading rate...</div>
+    </div>
+
+    <div class="flow-arrow">⬇️</div>
+
+    <!-- STEP 3: FINAL BTC -->
+    <div class="input-group">
+        <label for="btc-output">Step 3: Bitcoin (BTC)</label>
+        <input type="text" id="btc-output" class="read-only" readonly style="color: var(--accent-gold); font-weight: bold;">
+        <div class="rate-info" id="usd-btc-rate">Loading rate...</div>
+    </div>
+
+    <div id="status-message" class="status">Fetching real-time exchange rates...</div>
+</div>
+
+<script>
+    // Configuration & State
+    let zmwToUsdRate = 0;
+    let btcToUsdRate = 0;
+
+    const zmwInput = document.getElementById('zmw-input');
+    const usdOutput = document.getElementById('usd-output');
+    const btcOutput = document.getElementById('btc-output');
+    const zmwUsdLabel = document.getElementById('zmw-usd-rate');
+    const usdBtcLabel = document.getElementById('usd-btc-rate');
+    const statusMessage = document.getElementById('status-message');
+
+    // Fetch live market data sequentially
+    async function initializeRates() {
+        try {
+            // 1. Get USD to ZMW rate from ExchangeRate-API (Fallback to a backup if needed)
+            const fiatResponse = await fetch('https://er-api.com');
+            const fiatData = await fiatResponse.json();
+            
+            // The API returns ZMW per 1 USD. We need USD per 1 ZMW.
+            const zmwPerUsd = fiatData.rates.ZMW;
+            zmwToUsdRate = 1 / zmwPerUsd;
+
+            // 2. Get Bitcoin price in USD from CoinGecko
+            const cryptoResponse = await fetch('https://coingecko.com');
+            const cryptoData = await cryptoResponse.json();
+            btcToUsdRate = cryptoData.bitcoin.usd;
+
+            // Update UI elements with fetched base rates
+            zmwUsdLabel.textContent = `1 ZMW = $${zmwToUsdRate.toFixed(4)} USD`;
+            usdBtcLabel.textContent = `1 BTC = $${btcToUsdRate.toLocaleString()} USD`;
+            statusMessage.textContent = "Rates updated successfully.";
+            statusMessage.style.color = "#238636";
+
+            // Trigger initial calculation
+            calculatePipeline();
+        } catch (error) {
+            console.error("Error fetching live rates:", error);
+            statusMessage.textContent = "Error updating rates. Using baseline variables.";
+            statusMessage.style.color = "#da3637";
+            
+            // Hardcoded safe fallbacks if network fails
+            zmwToUsdRate = 0.038; 
+            btcToUsdRate = 65000;
+            calculatePipeline();
+        }
+    }
+
+    // Pipeline Calculation Engine
+    function calculatePipeline() {
+        const zmwAmount = parseFloat(zmwInput.value);
+
+        if (isNaN(zmwAmount) || zmwAmount <= 0) {
+            usdOutput.value = "$0.00";
+            btcOutput.value = "0.00000000 BTC";
+            return;
+        }
+
+        // Sequential Conversion Math
+        const calculatedUsd = zmwAmount * zmwToUsdRate;
+        const calculatedBtc = calculatedUsd / btcToUsdRate;
+
+        // Render Outputs cleanly
+        usdOutput.value = `$${calculatedUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        btcOutput.value = `${calculatedBtc.toFixed(8)} BTC`;
+    }
+
+    // Event Listener for keystroke/input changes
+    zmwInput.addEventListener('input', calculatePipeline);
+
+    // Bootstrap app
+    initializeRates();
+</script>
+
+</body>
+</html>
