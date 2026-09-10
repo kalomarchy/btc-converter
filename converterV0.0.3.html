@@ -96,10 +96,10 @@
     </style>
 </head>
 <body>
-
+    <hi>ZMW to USD to BTC</hi>
 <div class="app-container">
     <h2>Sequential Crypto Pipeline</h2>
-    
+        <h3>V0.0.3</h3>
     <!-- STEP 1: INPUT ZMW -->
     <div class="input-group">
         <label for="zmw-input">Step 1: Zambian Kwacha (ZMW)</label>
@@ -190,7 +190,7 @@
         const calculatedBtc = calculatedUsd / btcToUsdRate;
 
         // Render Outputs cleanly
-        usdOutput.value = `$${calculatedUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        usdOutput.value = `$${calculatedUsd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8})}`;
         btcOutput.value = `${calculatedBtc.toFixed(8)} BTC`;
     }
 
